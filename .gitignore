@@ -2,3 +2,8 @@
 *.mp4
 *.xlsx
 venv/
+runs/
+movies/
+images/
+data/
+*.pt
