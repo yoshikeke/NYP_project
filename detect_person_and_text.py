@@ -40,15 +40,10 @@ roi_x_end, roi_y_end = 1280, 800
 yolo_model = YOLO(r"C:\dev\litter_segmentation\runs\segment\train3\weights\best.pt")
 
 CONFIDENCE_THRESHOLD = 0.4
+number_y_coords = []
 
 def preprocess_for_ocr(image):
-    """
-    OCRに適した画像に前処理を行う関数。
-    明るい文字と暗い文字を別々に抽出し、白背景・黒文字の画像に変換する。
-
-    :param image: 入力画像 (OpenCV形式, BGR)
-    :return: 前処理後の画像 (グレースケール)
-    """
+   
     # 1. グレースケール変換
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -88,7 +83,18 @@ while cap.isOpened():
 
         allow_list = '0123456789-:'
         latest_ocr_results = reader.readtext(ocr_ready_frame, allowlist=allow_list)
-        cv2.imshow('ocr', ocr_ready_frame)
+        temp_coords = []
+        for(bbox, text, prob) in latest_ocr_results:
+            if prob >= CONFIDENCE_THRESHOLD:
+                try:
+                    number = int(text)
+                    if 1 <= number <= 60:
+                        y_center = (bbox[0][1] + bbox[2][1]) / 2
+                        temp_coords.append({'number': number, 'y': int(y_center)})
+                except ValueError:
+                    continue
+        number_y_coords = sorted(temp_coords, key=lambda item: item['y'])
+
     if frame_count % frame_skip_yolo == 0:
         yolo_results = yolo_model.track(processing_frame, persist=True)
 
@@ -101,16 +107,13 @@ while cap.isOpened():
                 original_top_left_x = int(coordinates[0][0]) + roi_x_start
                 original_top_left_y = int(coordinates[0][1]) + roi_y_start
                 
-                # ボトムライトの座標を取得し、ROIの開始オフセットを加算
                 original_bottom_right_x = int(coordinates[2][0]) + roi_x_start
                 original_bottom_right_y = int(coordinates[2][1]) + roi_y_start
                 
-                # 元のフレームの座標を使ってバウンディングボックスを描画
                 cv2.rectangle(processing_frame, 
                             (original_top_left_x, original_top_left_y), 
                             (original_bottom_right_x, original_bottom_right_y), 
                             (0, 255, 0), 2)
-                
                 cv2.putText(
                     img=processing_frame,
                     text=f"Text: {text} ({confidence:.2f})",
