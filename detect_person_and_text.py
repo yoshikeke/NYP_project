@@ -97,33 +97,29 @@ while cap.isOpened():
 
     if frame_count % frame_skip_yolo == 0:
         yolo_results = yolo_model.track(processing_frame, persist=True)
-
-        for result in latest_ocr_results:
-            coordinates = result[0]
-            text = result[1]        # Get the text here!
-            confidence = result[2]
-
-            if confidence >= CONFIDENCE_THRESHOLD:
-                original_top_left_x = int(coordinates[0][0]) + roi_x_start
-                original_top_left_y = int(coordinates[0][1]) + roi_y_start
-                
-                original_bottom_right_x = int(coordinates[2][0]) + roi_x_start
-                original_bottom_right_y = int(coordinates[2][1]) + roi_y_start
-                
-                cv2.rectangle(processing_frame, 
-                            (original_top_left_x, original_top_left_y), 
-                            (original_bottom_right_x, original_bottom_right_y), 
-                            (0, 255, 0), 2)
-                cv2.putText(
-                    img=processing_frame,
-                    text=f"Text: {text} ({confidence:.2f})",
-                    org=(original_top_left_x, original_top_left_y - 10),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=0.7,
-                    color=(0, 0, 255),
-                    thickness=2
-                )
         annotated_frame = yolo_results[0].plot()
+
+        if yolo_results[0].boxes is not None and len(number_y_coords) > 1:
+            trash_boxes = yolo_results[0].boxes.xyxy.cpu().numpy()
+            for trash_box in trash_boxes:
+                trash_y_center = (trash_box[1] + trash_box[3]) /2
+                location_text = "Unknown"
+                for i in range(len(number_y_coords) - 1, 0, -1):
+                    upper_num = number_y_coords[i]
+                    lower_num = number_y_coords[i-1]
+                    if lower_num['y'] < trash_y_center <= upper_num['y']:
+                        location_text = f"Between{lower_num['number']} and {upper_num['number']}"
+                        break
+                cv2.putText(annotated_frame, location_text, (int(trash_box[0]), int(trash_box[1]) - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,0), 2)
+
+     
+        
+        for coord in number_y_coords:
+            cv2.line(annotated_frame, (0, coord['y']), (output_width, coord['y']), (0, 255, 255), 1)
+            cv2.putText(annotated_frame, str(coord['number']), (10, coord['y']), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        
+        
         resized_frame = cv2.resize(annotated_frame, (output_width, output_height))
         cv2.imshow('Detections', resized_frame)
     
