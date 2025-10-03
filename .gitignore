@@ -7,3 +7,7 @@ movies/
 images/
 data/
 *.pt
+*.txt
+*.xml
+*.iml
+*.cache
